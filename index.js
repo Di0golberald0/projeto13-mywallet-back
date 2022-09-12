@@ -6,28 +6,91 @@ import joi from "joi";
 import dayjs from "dayjs";
 
 dotenv.config();
-const app = express();
+const server = express();
 
-app.use(cors());
-app.use(express.json());
+server.use(cors());
+server.use(express.json());
 
-// Modelos ou Schemas
+const signinSchema = joi.object({
+  email: joi.string().min(1).required(),
+  password: joi.string().min(1).required(),
+});
 
-const participantSchema = joi.object({
+const signupSchema = joi.object({
   name: joi.string().min(1).required(),
+  email: joi.string().min(1).required(),
+  password: joi.string().min(1).required(),
+  confirm: joi.string().ref(password).required(),
 });
 
-const messageSchema = joi.object({
-  from: joi.string().required(),
-  to: joi.string().min(1).required(),
-  text: joi.string().min(1).required(),
-  type: joi.string().valid("message", "private_message").required(),
-  time: joi.string(),
-});
-
-//Conexão com o mongodb
 const mongoClient = new MongoClient(process.env.MONGO_URI);
 let db;
 mongoClient.connect().then(() => {
-  db = mongoClient.db("batepapouol");
+  db = mongoClient.db("mywallet");
 });
+
+server.post("/", async (req, res) => {
+  const user = req.body;
+    
+  const validation = signinSchema.validate(user, {
+    abortEarly: false,
+  });
+  if (validation.error) {
+    const errors = validation.error.details.map((detail) => detail.message);
+    res.status(422).send(errors);
+    return;
+  }
+    
+  try {
+    const userExists = await db
+    .collection("users")
+    .findOne({ email: user.email, password: user.password });
+    
+    if (!userExists) {
+      res.status(404).send("Nenhum usuário encontrado!");
+      return;
+    }
+    
+    res.send(201);
+  }
+  catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
+server.post("/signup", async (req, res) => {
+  const user = req.body;
+  
+  const validation = signupSchema.validate(user, {
+    abortEarly: false,
+  });
+  if (validation.error) {
+    const errors = validation.error.details.map((detail) => detail.message);
+    res.status(422).send(errors);
+    return;
+  }
+  
+  try {
+    const userExists = await db
+    .collection("users")
+    .findOne({ name: user.name, email: user.email, password: user.password });
+  
+    if (userExists) {
+      res.send(409).send("Esse usuário já existe!");;
+      return;
+    }
+  
+    await db.collection("users").insertOne({
+      name: user.name,
+      email: user.email,
+      password: user.password,
+    });
+  
+    res.send(201);
+  } 
+  catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
+server.listen(5000, () => console.log(`App running in port: 5000`));
