@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { MongoClient, ObjectId } from "mongodb";
 import joi from "joi";
+import bcrypt from 'bcrypt';
 import dayjs from "dayjs";
 
 dotenv.config();
@@ -44,9 +45,9 @@ server.post("/", async (req, res) => {
   try {
     const userExists = await db
     .collection("users")
-    .findOne({ email: user.email, password: user.password });
+    .findOne({ email: user.email });
     
-    if (!userExists) {
+    if (!userExists || !bcrypt.compareSync(user.password, userExists.password)) {
       res.status(404).send("Nenhum usuário encontrado!");
       return;
     }
@@ -71,9 +72,10 @@ server.post("/signup", async (req, res) => {
   }
   
   try {
+    const passwordHash = bcrypt.hashSync(user.password, 10);
     const userExists = await db
     .collection("users")
-    .findOne({ name: user.name, email: user.email, password: user.password });
+    .findOne({ name: user.name, email: user.email, password: passwordHash });
   
     if (userExists) {
       res.send(409).send("Esse usuário já existe!");;
@@ -83,7 +85,7 @@ server.post("/signup", async (req, res) => {
     await db.collection("users").insertOne({
       name: user.name,
       email: user.email,
-      password: user.password,
+      password: passwordHash,
     });
   
     res.send(201);
