@@ -30,7 +30,7 @@ mongoClient.connect().then(() => {
   db = mongoClient.db("mywallet");
 });
 
-server.post("/", async (req, res) => {
+server.post("/singin", async (req, res) => {
   const user = req.body;
     
   const validation = signinSchema.validate(user, {
